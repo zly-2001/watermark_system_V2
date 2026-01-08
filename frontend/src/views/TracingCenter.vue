@@ -309,7 +309,7 @@ const downloadReport = async () => {
     formData.append('image_base64', sourceImage.value)
 
     const response = await request({
-      url: '/report',
+      url: '/watermark/report',
       method: 'post',
       data: formData,
       responseType: 'blob',
@@ -318,8 +318,12 @@ const downloadReport = async () => {
       }
     })
 
+    // 对于 blob 响应，response 是完整的 axios response 对象
+    // response.data 才是 blob 数据
+    const blob = response.data instanceof Blob ? response.data : new Blob([response.data])
+    
     // 创建下载链接
-    const url = window.URL.createObjectURL(new Blob([response]))
+    const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.setAttribute('download', `watermark_report_${Date.now()}.pdf`)
@@ -331,6 +335,7 @@ const downloadReport = async () => {
     ElMessage.success('报告下载成功')
   } catch (error) {
     console.error('下载失败:', error)
+    ElMessage.error('报告下载失败: ' + (error.message || '未知错误'))
   }
 }
 

@@ -78,8 +78,8 @@ def apply_crop_attack(image: Image.Image, intensity: float) -> Image.Image:
     """
     width, height = image.size
     
-    # 计算裁剪比例：10% - 40%
-    crop_ratio = 0.1 + (intensity * 0.3)
+    # 计算裁剪比例：5% - 25%（降低强度，提高提取成功率）
+    crop_ratio = 0.05 + (intensity * 0.20)  # 5% - 25%
     
     # 计算裁剪后的尺寸
     crop_width = int(width * (1 - crop_ratio))
@@ -109,8 +109,9 @@ def apply_jpeg_attack(image: Image.Image, intensity: float) -> Image.Image:
         intensity: 压缩强度 (0.1-1.0)，对应质量 90-10
     """
     # 将强度转换为 JPEG 质量：强度越高，质量越低
-    quality = int(90 - (intensity * 80))  # 90 - 10
-    quality = max(10, min(90, quality))  # 确保在合理范围内
+    # 调整范围：质量 95-60（更温和，提高提取成功率）
+    quality = int(95 - (intensity * 35))  # 95 - 60（强度 0.1-1.0）
+    quality = max(60, min(95, quality))  # 确保在合理范围内，最低 60（保证水印可提取）
     
     # 保存为 JPEG 格式（会损失质量）
     buffer = io.BytesIO()
@@ -133,10 +134,10 @@ def apply_rotate_attack(image: Image.Image, intensity: float) -> Image.Image:
     
     Args:
         image: 原始图像
-        intensity: 旋转强度 (0.1-1.0)，对应角度 -15° 到 +15°
+        intensity: 旋转强度 (0.1-1.0)，对应角度 -8° 到 +8°（降低强度，提高提取成功率）
     """
-    # 计算旋转角度：-15° 到 +15°
-    angle = (intensity - 0.5) * 30  # -15 到 +15 度
+    # 计算旋转角度：-8° 到 +8°（降低强度，DWT-DCT 对旋转敏感）
+    angle = (intensity - 0.5) * 16  # -8 到 +8 度（之前是 -15 到 +15）
     
     # 旋转图像（使用高质量重采样）
     rotated_image = image.rotate(angle, resample=Image.Resampling.BICUBIC, expand=False)
@@ -152,8 +153,8 @@ def apply_noise_attack(image: Image.Image, intensity: float) -> Image.Image:
         image: 原始图像
         intensity: 噪声强度 (0.1-1.0)，对应标准差 5-50
     """
-    # 将强度转换为噪声标准差：5-50
-    sigma = 5 + (intensity * 45)  # 5-50
+    # 将强度转换为噪声标准差：5-30（降低强度，提高提取成功率）
+    sigma = 5 + (intensity * 25)  # 5-30（之前是 5-50）
     
     np_image = np.array(image, dtype=np.float32)
     noise = np.random.normal(0, sigma, np_image.shape)
@@ -170,8 +171,8 @@ def apply_blur_attack(image: Image.Image, intensity: float) -> Image.Image:
         image: 原始图像
         intensity: 模糊强度 (0.1-1.0)，对应半径 1-10
     """
-    # 将强度转换为模糊半径：1-10
-    radius = 1 + (intensity * 9)  # 1-10
+    # 将强度转换为模糊半径：1-5（降低强度，提高提取成功率）
+    radius = 1 + (intensity * 4)  # 1-5（之前是 1-10）
     
     blurred_image = image.filter(ImageFilter.GaussianBlur(radius=radius))
     

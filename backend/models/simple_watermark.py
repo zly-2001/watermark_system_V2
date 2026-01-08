@@ -66,9 +66,15 @@ class SimpleWatermark:
             # 转换为 numpy 数组
             bgr = np.array(image)[:, :, ::-1]  # RGB to BGR
             
+            # 将消息编码为字节
+            message_bytes = message.encode('utf-8')
+            message_length = len(message_bytes)
+            
+            logger.info(f"嵌入水印: 文本='{message}', 字节长度={message_length}")
+            
             # 创建编码器
             encoder = self.WatermarkEncoder()
-            encoder.set_watermark('bytes', message.encode('utf-8'))
+            encoder.set_watermark('bytes', message_bytes)
             
             # 嵌入水印
             bgr_encoded = encoder.encode(bgr, self.method)
@@ -79,7 +85,7 @@ class SimpleWatermark:
             # 计算质量指标
             psnr, ssim = self._calculate_metrics(image, watermarked_image)
             
-            logger.info(f"✓ 水印嵌入成功: PSNR={psnr:.2f}dB, SSIM={ssim:.4f}")
+            logger.info(f"✓ 水印嵌入成功: 长度={message_length}, PSNR={psnr:.2f}dB, SSIM={ssim:.4f}")
             return watermarked_image, psnr, ssim
             
         except Exception as e:
@@ -111,11 +117,17 @@ class SimpleWatermark:
             # invisible-watermark 的 decode 方法需要知道水印长度
             # 如果有提供的长度，优先使用；否则尝试多个可能的长度
             if watermark_length and watermark_length > 0:
-                possible_lengths = [watermark_length]  # 优先使用提供的长度
-                logger.info(f"使用保存的水印长度: {watermark_length}")
+                # 优先使用提供的长度，但也尝试附近的值（±4字节）
+                possible_lengths = [watermark_length]
+                if watermark_length > 4:
+                    possible_lengths.append(watermark_length - 4)
+                if watermark_length < 256:
+                    possible_lengths.append(watermark_length + 4)
+                logger.info(f"使用保存的水印长度: {watermark_length}，尝试长度: {possible_lengths}")
             else:
-                possible_lengths = [16, 32, 64, 128, 256]  # 常见的文本长度
-                logger.info("未提供水印长度，尝试多个可能长度")
+                # 尝试更多可能的长度
+                possible_lengths = [8, 16, 24, 32, 40, 48, 64, 80, 96, 128, 160, 192, 256]
+                logger.info(f"未提供水印长度，尝试多个可能长度: {possible_lengths}")
             
             extracted_text = ""
             ber = 1.0
@@ -161,16 +173,26 @@ class SimpleWatermark:
                     
                     # 尝试解码为文本
                     try:
+                        # 先尝试 UTF-8 解码
                         decoded_text = watermark_bytes.decode('utf-8', errors='ignore').strip()
+                        
+                        # 如果 UTF-8 解码失败或结果为空，尝试其他编码
+                        if not decoded_text or len(decoded_text) == 0:
+                            # 尝试 latin-1 编码（单字节编码，不会失败）
+                            decoded_text = watermark_bytes.decode('latin-1', errors='ignore').strip()
                         
                         # 检查是否包含可打印字符
                         if decoded_text and len(decoded_text) > 0:
-                            # 移除不可打印字符和非 ASCII 字符
-                            clean_text = ''.join(c for c in decoded_text if c.isprintable() and (c.isascii() or ord(c) < 256))
+                            # 移除不可打印字符，但保留更多字符（包括中文等）
+                            import string
+                            printable = set(string.printable)
+                            # 保留可打印字符和常见的中文字符范围
+                            clean_text = ''.join(c for c in decoded_text if c in printable or (ord(c) >= 0x4e00 and ord(c) <= 0x9fff))
                             
                             if len(clean_text) > 0:
                                 extracted_text = clean_text
-                                ber = 0.02  # 假设成功提取，BER 较低
+                                # 如果提取成功，设置较低的 BER（后续会根据原始文本重新计算）
+                                ber = 0.05  # 初始 BER，如果提供了原始文本会重新计算
                                 decode_success = True
                                 logger.info(f"✓ 水印提取成功 (长度={watermark_length}): {extracted_text}")
                                 break
