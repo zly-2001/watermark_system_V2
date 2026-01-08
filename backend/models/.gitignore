@@ -1,0 +1,18 @@
+# 忽略所有模型权重文件（通常很大，不应提交到 Git）
+checkpoints/*.pth
+checkpoints/*.pt
+checkpoints/*.ckpt
+checkpoints/*.pkl
+
+# 但保留目录结构
+!checkpoints/.gitkeep
+
+# 忽略其他大文件
+*.h5
+*.pb
+*.onnx
+
+# 保留配置文件
+!configs/*.yaml
+!configs/*.json
+
